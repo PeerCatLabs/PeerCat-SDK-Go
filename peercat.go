@@ -2,7 +2,10 @@
 //
 // # Quick Start
 //
-//	client := peercat.New("pcat_live_xxx")
+//	client, err := peercat.New("pcat_live_xxx")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
 //
 //	result, err := client.Generate(ctx, &peercat.GenerateParams{
 //	    Prompt: "A beautiful sunset over mountains",
@@ -15,11 +18,14 @@
 //
 // # Configuration
 //
-//	client := peercat.New("pcat_live_xxx",
+//	client, err := peercat.New("pcat_live_xxx",
 //	    peercat.WithBaseURL("https://custom.api.url"),
 //	    peercat.WithTimeout(30 * time.Second),
 //	    peercat.WithMaxRetries(5),
 //	)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
 //
 // # Demo Mode
 //
@@ -66,11 +72,14 @@ type Client struct {
 // Option is a functional option for configuring the client
 type Option func(*Client)
 
+// ErrEmptyAPIKey is returned when an empty API key is provided
+var ErrEmptyAPIKey = fmt.Errorf("peercat: API key is required")
+
 // New creates a new PeerCat client with the given API key
-// Panics if apiKey is empty - validate your configuration before calling New
-func New(apiKey string, opts ...Option) *Client {
+// Returns an error if apiKey is empty
+func New(apiKey string, opts ...Option) (*Client, error) {
 	if apiKey == "" {
-		panic("peercat: API key is required")
+		return nil, ErrEmptyAPIKey
 	}
 
 	c := &Client{
@@ -86,7 +95,7 @@ func New(apiKey string, opts ...Option) *Client {
 		opt(c)
 	}
 
-	return c
+	return c, nil
 }
 
 // WithBaseURL sets a custom base URL

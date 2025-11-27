@@ -3,14 +3,28 @@ package peercat
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 )
 
+// mustNew is a test helper that creates a client and fails the test if there's an error
+func mustNew(t *testing.T, apiKey string, opts ...Option) *Client {
+	t.Helper()
+	client, err := New(apiKey, opts...)
+	if err != nil {
+		t.Fatalf("failed to create client: %v", err)
+	}
+	return client
+}
+
 func TestNew(t *testing.T) {
-	client := New("test_key")
+	client, err := New("test_key")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if client.apiKey != "test_key" {
 		t.Errorf("expected apiKey to be 'test_key', got '%s'", client.apiKey)
@@ -23,12 +37,25 @@ func TestNew(t *testing.T) {
 	}
 }
 
+func TestNewWithEmptyAPIKey(t *testing.T) {
+	_, err := New("")
+	if err == nil {
+		t.Error("expected error for empty API key")
+	}
+	if !errors.Is(err, ErrEmptyAPIKey) {
+		t.Errorf("expected ErrEmptyAPIKey, got %v", err)
+	}
+}
+
 func TestNewWithOptions(t *testing.T) {
-	client := New("test_key",
+	client, err := New("test_key",
 		WithBaseURL("https://custom.url"),
 		WithTimeout(30*time.Second),
 		WithMaxRetries(5),
 	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if client.baseURL != "https://custom.url" {
 		t.Errorf("expected baseURL to be 'https://custom.url', got '%s'", client.baseURL)
@@ -70,7 +97,7 @@ func TestGenerate(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL))
 	result, err := client.Generate(context.Background(), &GenerateParams{
 		Prompt: "test prompt",
 	})
@@ -105,7 +132,7 @@ func TestGenerateDemo(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL))
 	result, err := client.Generate(context.Background(), &GenerateParams{
 		Prompt: "test",
 		Mode:   ModeDemo,
@@ -140,7 +167,7 @@ func TestGetModels(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL))
 	models, err := client.GetModels(context.Background())
 
 	if err != nil {
@@ -161,7 +188,7 @@ func TestGetBalance(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL))
 	balance, err := client.GetBalance(context.Background())
 
 	if err != nil {
@@ -193,7 +220,7 @@ func TestGetHistory(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL))
 	history, err := client.GetHistory(context.Background(), &HistoryParams{
 		Limit:  10,
 		Offset: 20,
@@ -225,7 +252,7 @@ func TestAuthenticationError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("bad_key", WithBaseURL(server.URL), WithMaxRetries(0))
+	client := mustNew(t, "bad_key", WithBaseURL(server.URL), WithMaxRetries(0))
 	_, err := client.GetBalance(context.Background())
 
 	if err == nil {
@@ -262,7 +289,7 @@ func TestInsufficientCreditsError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL), WithMaxRetries(0))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL), WithMaxRetries(0))
 	_, err := client.Generate(context.Background(), &GenerateParams{Prompt: "test"})
 
 	if err == nil {
@@ -296,7 +323,7 @@ func TestRateLimitError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL), WithMaxRetries(0))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL), WithMaxRetries(0))
 	_, err := client.GetBalance(context.Background())
 
 	if err == nil {
@@ -331,7 +358,7 @@ func TestSubmitPrompt(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL))
 	result, err := client.SubmitPrompt(context.Background(), &SubmitPromptParams{
 		Prompt: "test",
 	})
@@ -359,7 +386,7 @@ func TestGetOnChainStatus(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL))
 	status, err := client.GetOnChainStatus(context.Background(), "txSig123")
 
 	if err != nil {
@@ -411,7 +438,7 @@ func TestGetPrices(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL))
 	prices, err := client.GetPrices(context.Background())
 
 	if err != nil {
@@ -450,7 +477,7 @@ func TestListKeys(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL))
 	result, err := client.ListKeys(context.Background())
 
 	if err != nil {
@@ -491,7 +518,7 @@ func TestCreateKey(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL))
 	result, err := client.CreateKey(context.Background(), &CreateKeyParams{
 		Name:      "Test Key",
 		Message:   "Create key",
@@ -523,7 +550,7 @@ func TestRevokeKey(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL))
 	err := client.RevokeKey(context.Background(), "key_123")
 
 	if err != nil {
@@ -551,7 +578,7 @@ func TestUpdateKeyName(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL))
 	err := client.UpdateKeyName(context.Background(), "key_123", "New Name")
 
 	if err != nil {
@@ -582,7 +609,7 @@ func TestRateLimitHeaderParsing(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL), WithMaxRetries(0))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL), WithMaxRetries(0))
 	_, err := client.GetBalance(context.Background())
 
 	if err == nil {

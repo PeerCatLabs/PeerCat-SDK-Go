@@ -21,7 +21,7 @@ func TestMalformedJSONResponse(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL), WithMaxRetries(0))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL), WithMaxRetries(0))
 	_, err := client.GetBalance(context.Background())
 
 	if err == nil {
@@ -37,7 +37,7 @@ func TestMalformedJSONErrorResponse(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL), WithMaxRetries(0))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL), WithMaxRetries(0))
 	_, err := client.GetBalance(context.Background())
 
 	if err == nil {
@@ -53,7 +53,7 @@ func TestEmptyResponseBody(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL))
 	_, err := client.GetBalance(context.Background())
 
 	// Should either return empty result or error, not panic
@@ -71,7 +71,7 @@ func TestErrorResponseWithoutErrorWrapper(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL), WithMaxRetries(0))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL), WithMaxRetries(0))
 	_, err := client.GetBalance(context.Background())
 
 	if err == nil {
@@ -99,7 +99,7 @@ func TestHTTP403Forbidden(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL), WithMaxRetries(0))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL), WithMaxRetries(0))
 	_, err := client.GetBalance(context.Background())
 
 	if err == nil {
@@ -135,7 +135,7 @@ func TestHTTP404NotFound(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL), WithMaxRetries(0))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL), WithMaxRetries(0))
 	_, err := client.GetOnChainStatus(context.Background(), "invalid_tx")
 
 	if err == nil {
@@ -171,7 +171,7 @@ func TestHTTP502BadGateway(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL), WithMaxRetries(0))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL), WithMaxRetries(0))
 	_, err := client.GetBalance(context.Background())
 
 	if err == nil {
@@ -207,7 +207,7 @@ func TestHTTP503ServiceUnavailable(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL), WithMaxRetries(0))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL), WithMaxRetries(0))
 	_, err := client.GetBalance(context.Background())
 
 	if err == nil {
@@ -233,7 +233,7 @@ func TestHTTP504GatewayTimeout(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL), WithMaxRetries(0))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL), WithMaxRetries(0))
 	_, err := client.GetBalance(context.Background())
 
 	if err == nil {
@@ -268,7 +268,7 @@ func TestRetry5xxErrors(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL), WithMaxRetries(2))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL), WithMaxRetries(2))
 	balance, err := client.GetBalance(context.Background())
 
 	if err != nil {
@@ -304,7 +304,7 @@ func TestNoRetry4xxErrors(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL), WithMaxRetries(3))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL), WithMaxRetries(3))
 	_, err := client.GetBalance(context.Background())
 
 	if err == nil {
@@ -340,7 +340,7 @@ func TestRateLimitHeaderParsingDetails(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL), WithMaxRetries(0))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL), WithMaxRetries(0))
 	_, err := client.GetBalance(context.Background())
 
 	if err == nil {
@@ -392,7 +392,7 @@ func TestRateLimitRetry(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL), WithMaxRetries(1))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL), WithMaxRetries(1))
 	balance, err := client.GetBalance(context.Background())
 
 	if err != nil {
@@ -428,7 +428,7 @@ func TestErrorStatusCode(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL), WithMaxRetries(0))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL), WithMaxRetries(0))
 	_, err := client.GetBalance(context.Background())
 
 	apiErr, ok := err.(*Error)
@@ -469,7 +469,7 @@ func TestErrorWithParam(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL), WithMaxRetries(0))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL), WithMaxRetries(0))
 	_, err := client.Generate(context.Background(), &GenerateParams{
 		Prompt: "test",
 		Model:  "invalid_model",
@@ -505,7 +505,7 @@ func TestVeryLongPrompt(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL), WithMaxRetries(0))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL), WithMaxRetries(0))
 	longPrompt := strings.Repeat("x", 10000)
 	_, err := client.Generate(context.Background(), &GenerateParams{Prompt: longPrompt})
 
@@ -531,7 +531,7 @@ func TestSpecialCharactersInPrompt(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL))
 	specialPrompt := `Test with "quotes" and <tags> and émojis 🎨`
 
 	_, err := client.Generate(context.Background(), &GenerateParams{Prompt: specialPrompt})
@@ -562,7 +562,7 @@ func TestUnicodeInPrompt(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL))
 	unicodePrompt := "日本語テスト 中文测试 한국어테스트"
 
 	_, err := client.Generate(context.Background(), &GenerateParams{Prompt: unicodePrompt})
@@ -591,7 +591,7 @@ func TestExtraFieldsInResponse(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL))
 	balance, err := client.GetBalance(context.Background())
 
 	if err != nil {
@@ -615,7 +615,7 @@ func TestVeryLargeNumericValues(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL))
 	balance, err := client.GetBalance(context.Background())
 
 	if err != nil {
@@ -643,7 +643,7 @@ func TestZeroCredits(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL))
 	balance, err := client.GetBalance(context.Background())
 
 	if err != nil {
@@ -664,7 +664,7 @@ func TestRequestTimeout(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL), WithTimeout(50*time.Millisecond), WithMaxRetries(0))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL), WithTimeout(50*time.Millisecond), WithMaxRetries(0))
 	_, err := client.GetBalance(context.Background())
 
 	if err == nil {
@@ -679,7 +679,7 @@ func TestContextCancellation(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("test_key", WithBaseURL(server.URL))
+	client := mustNew(t, "test_key", WithBaseURL(server.URL))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
@@ -701,7 +701,7 @@ func TestAPIKeyInAuthorizationHeader(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New("pcat_live_test123", WithBaseURL(server.URL))
+	client := mustNew(t, "pcat_live_test123", WithBaseURL(server.URL))
 	_, _ = client.GetBalance(context.Background())
 
 	expected := "Bearer pcat_live_test123"
