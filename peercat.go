@@ -40,6 +40,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -66,7 +67,12 @@ type Client struct {
 type Option func(*Client)
 
 // New creates a new PeerCat client with the given API key
+// Panics if apiKey is empty - validate your configuration before calling New
 func New(apiKey string, opts ...Option) *Client {
+	if apiKey == "" {
+		panic("peercat: API key is required")
+	}
+
 	c := &Client{
 		apiKey:  apiKey,
 		baseURL: DefaultBaseURL,
@@ -84,9 +90,10 @@ func New(apiKey string, opts ...Option) *Client {
 }
 
 // WithBaseURL sets a custom base URL
+// Trailing slashes are automatically trimmed to prevent double-slash issues
 func WithBaseURL(url string) Option {
 	return func(c *Client) {
-		c.baseURL = url
+		c.baseURL = strings.TrimRight(url, "/")
 	}
 }
 
@@ -255,11 +262,16 @@ func (c *Client) request(ctx context.Context, method, path string, query url.Val
 			return err
 		}
 
-		// Exponential backoff
+		// Exponential backoff (or use Retry-After for rate limits)
 		if attempt < c.maxRetries {
 			delay := time.Duration(1<<attempt) * time.Second
 			if delay > 10*time.Second {
 				delay = 10 * time.Second
+			}
+
+			// Use Retry-After header if available for rate limit errors
+			if apiErr, ok := err.(*Error); ok && apiErr.RateLimitInfo != nil && apiErr.RateLimitInfo.RetryAfter > 0 {
+				delay = time.Duration(apiErr.RateLimitInfo.RetryAfter) * time.Second
 			}
 
 			select {
@@ -308,6 +320,9 @@ func (c *Client) doRequest(ctx context.Context, method, path string, query url.V
 	}
 	defer resp.Body.Close()
 
+	// Parse rate limit headers
+	rateLimitInfo := parseRateLimitHeaders(resp.Header)
+
 	// Read response body
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -319,13 +334,14 @@ func (c *Client) doRequest(ctx context.Context, method, path string, query url.V
 		var errResp apiErrorResponse
 		if err := json.Unmarshal(respBody, &errResp); err != nil {
 			return &Error{
-				Status:  resp.StatusCode,
-				Type:    "unknown",
-				Code:    "parse_error",
-				Message: string(respBody),
+				Status:        resp.StatusCode,
+				Type:          "unknown",
+				Code:          "parse_error",
+				Message:       string(respBody),
+				RateLimitInfo: rateLimitInfo,
 			}
 		}
-		return errorFromResponse(resp.StatusCode, &errResp)
+		return errorFromResponse(resp.StatusCode, &errResp, rateLimitInfo)
 	}
 
 	// Parse successful response
@@ -336,6 +352,45 @@ func (c *Client) doRequest(ctx context.Context, method, path string, query url.V
 	}
 
 	return nil
+}
+
+// parseRateLimitHeaders parses rate limit information from response headers
+func parseRateLimitHeaders(headers http.Header) *RateLimitInfo {
+	info := &RateLimitInfo{}
+	hasInfo := false
+
+	if limit := headers.Get("X-RateLimit-Limit"); limit != "" {
+		if v, err := strconv.Atoi(limit); err == nil {
+			info.Limit = v
+			hasInfo = true
+		}
+	}
+
+	if remaining := headers.Get("X-RateLimit-Remaining"); remaining != "" {
+		if v, err := strconv.Atoi(remaining); err == nil {
+			info.Remaining = v
+			hasInfo = true
+		}
+	}
+
+	if reset := headers.Get("X-RateLimit-Reset"); reset != "" {
+		if v, err := strconv.ParseInt(reset, 10, 64); err == nil {
+			info.Reset = v
+			hasInfo = true
+		}
+	}
+
+	if retryAfter := headers.Get("Retry-After"); retryAfter != "" {
+		if v, err := strconv.Atoi(retryAfter); err == nil {
+			info.RetryAfter = v
+			hasInfo = true
+		}
+	}
+
+	if !hasInfo {
+		return nil
+	}
+	return info
 }
 
 type successResponse struct {

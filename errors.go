@@ -2,13 +2,26 @@ package peercat
 
 import "fmt"
 
+// RateLimitInfo contains rate limit information from response headers
+type RateLimitInfo struct {
+	// Limit is the maximum requests allowed in the window
+	Limit int
+	// Remaining is the remaining requests in the current window
+	Remaining int
+	// Reset is the Unix timestamp when the rate limit resets
+	Reset int64
+	// RetryAfter is the number of seconds to wait before retrying (from Retry-After header)
+	RetryAfter int
+}
+
 // Error represents an API error
 type Error struct {
-	Status  int     `json:"-"`
-	Type    string  `json:"type"`
-	Code    string  `json:"code"`
-	Message string  `json:"message"`
-	Param   *string `json:"param,omitempty"`
+	Status        int            `json:"-"`
+	Type          string         `json:"type"`
+	Code          string         `json:"code"`
+	Message       string         `json:"message"`
+	Param         *string        `json:"param,omitempty"`
+	RateLimitInfo *RateLimitInfo `json:"-"`
 }
 
 // Error implements the error interface
@@ -60,12 +73,13 @@ type apiErrorResponse struct {
 }
 
 // errorFromResponse creates an Error from an API error response
-func errorFromResponse(status int, resp *apiErrorResponse) *Error {
+func errorFromResponse(status int, resp *apiErrorResponse, rateLimitInfo *RateLimitInfo) *Error {
 	return &Error{
-		Status:  status,
-		Type:    resp.Error.Type,
-		Code:    resp.Error.Code,
-		Message: resp.Error.Message,
-		Param:   resp.Error.Param,
+		Status:        status,
+		Type:          resp.Error.Type,
+		Code:          resp.Error.Code,
+		Message:       resp.Error.Message,
+		Param:         resp.Error.Param,
+		RateLimitInfo: rateLimitInfo,
 	}
 }

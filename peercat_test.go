@@ -389,3 +389,224 @@ func TestErrorMessage(t *testing.T) {
 		t.Errorf("expected '%s', got '%s'", expected, err.Error())
 	}
 }
+
+func TestGetPrices(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Errorf("expected GET, got %s", r.Method)
+		}
+		if r.URL.Path != "/v1/price" {
+			t.Errorf("expected /v1/price, got %s", r.URL.Path)
+		}
+
+		json.NewEncoder(w).Encode(PriceResponse{
+			SOLPrice:          150.00,
+			SlippageTolerance: 0.02,
+			UpdatedAt:         time.Now().Format(time.RFC3339),
+			Models: []ModelPrice{
+				{Model: "stable-diffusion-xl", PriceUSD: 0.05, PriceSOL: 0.00033},
+			},
+		})
+	}))
+	defer server.Close()
+
+	client := New("test_key", WithBaseURL(server.URL))
+	prices, err := client.GetPrices(context.Background())
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if prices.SOLPrice != 150.00 {
+		t.Errorf("expected SOLPrice 150.00, got %f", prices.SOLPrice)
+	}
+	if len(prices.Models) != 1 {
+		t.Errorf("expected 1 model price, got %d", len(prices.Models))
+	}
+}
+
+func TestListKeys(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Errorf("expected GET, got %s", r.Method)
+		}
+		if r.URL.Path != "/v1/keys" {
+			t.Errorf("expected /v1/keys, got %s", r.URL.Path)
+		}
+
+		json.NewEncoder(w).Encode(KeysResponse{
+			Keys: []APIKey{
+				{
+					ID:          "key_123",
+					Name:        strPtr("Production Key"),
+					KeyPrefix:   "pcat_live_xxx",
+					Environment: KeyEnvironmentLive,
+				},
+			},
+		})
+	}))
+	defer server.Close()
+
+	client := New("test_key", WithBaseURL(server.URL))
+	result, err := client.ListKeys(context.Background())
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Keys) != 1 {
+		t.Errorf("expected 1 key, got %d", len(result.Keys))
+	}
+	if result.Keys[0].ID != "key_123" {
+		t.Errorf("expected key ID 'key_123', got '%s'", result.Keys[0].ID)
+	}
+}
+
+func TestCreateKey(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+		if r.URL.Path != "/v1/keys" {
+			t.Errorf("expected /v1/keys, got %s", r.URL.Path)
+		}
+
+		var params CreateKeyParams
+		json.NewDecoder(r.Body).Decode(&params)
+
+		if params.Name != "Test Key" {
+			t.Errorf("expected name 'Test Key', got '%s'", params.Name)
+		}
+
+		json.NewEncoder(w).Encode(CreateKeyResult{
+			ID:          "key_new",
+			Key:         "pcat_live_secretkey123",
+			KeyPrefix:   "pcat_live_sec",
+			Name:        strPtr("Test Key"),
+			Environment: "live",
+			Warning:     "Save this key securely. It will not be shown again.",
+		})
+	}))
+	defer server.Close()
+
+	client := New("test_key", WithBaseURL(server.URL))
+	result, err := client.CreateKey(context.Background(), &CreateKeyParams{
+		Name:      "Test Key",
+		Message:   "Create key",
+		Signature: "sig123",
+		PublicKey: "pubkey123",
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.ID != "key_new" {
+		t.Errorf("expected ID 'key_new', got '%s'", result.ID)
+	}
+	if result.Key != "pcat_live_secretkey123" {
+		t.Errorf("expected full key, got '%s'", result.Key)
+	}
+}
+
+func TestRevokeKey(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			t.Errorf("expected DELETE, got %s", r.Method)
+		}
+		if r.URL.Path != "/v1/keys/key_123" {
+			t.Errorf("expected /v1/keys/key_123, got %s", r.URL.Path)
+		}
+
+		json.NewEncoder(w).Encode(successResponse{Success: true})
+	}))
+	defer server.Close()
+
+	client := New("test_key", WithBaseURL(server.URL))
+	err := client.RevokeKey(context.Background(), "key_123")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateKeyName(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch {
+			t.Errorf("expected PATCH, got %s", r.Method)
+		}
+		if r.URL.Path != "/v1/keys/key_123" {
+			t.Errorf("expected /v1/keys/key_123, got %s", r.URL.Path)
+		}
+
+		var body map[string]string
+		json.NewDecoder(r.Body).Decode(&body)
+
+		if body["name"] != "New Name" {
+			t.Errorf("expected name 'New Name', got '%s'", body["name"])
+		}
+
+		json.NewEncoder(w).Encode(successResponse{Success: true})
+	}))
+	defer server.Close()
+
+	client := New("test_key", WithBaseURL(server.URL))
+	err := client.UpdateKeyName(context.Background(), "key_123", "New Name")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRateLimitHeaderParsing(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-RateLimit-Limit", "100")
+		w.Header().Set("X-RateLimit-Remaining", "0")
+		w.Header().Set("X-RateLimit-Reset", "1700000000")
+		w.Header().Set("Retry-After", "30")
+
+		w.WriteHeader(http.StatusTooManyRequests)
+		json.NewEncoder(w).Encode(apiErrorResponse{
+			Error: struct {
+				Type    string  `json:"type"`
+				Code    string  `json:"code"`
+				Message string  `json:"message"`
+				Param   *string `json:"param"`
+			}{
+				Type:    "rate_limit_error",
+				Code:    "rate_limit_exceeded",
+				Message: "Rate limit exceeded",
+			},
+		})
+	}))
+	defer server.Close()
+
+	client := New("test_key", WithBaseURL(server.URL), WithMaxRetries(0))
+	_, err := client.GetBalance(context.Background())
+
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	apiErr, ok := err.(*Error)
+	if !ok {
+		t.Fatalf("expected *Error, got %T", err)
+	}
+	if apiErr.RateLimitInfo == nil {
+		t.Fatal("expected RateLimitInfo to be set")
+	}
+	if apiErr.RateLimitInfo.Limit != 100 {
+		t.Errorf("expected Limit 100, got %d", apiErr.RateLimitInfo.Limit)
+	}
+	if apiErr.RateLimitInfo.Remaining != 0 {
+		t.Errorf("expected Remaining 0, got %d", apiErr.RateLimitInfo.Remaining)
+	}
+	if apiErr.RateLimitInfo.Reset != 1700000000 {
+		t.Errorf("expected Reset 1700000000, got %d", apiErr.RateLimitInfo.Reset)
+	}
+	if apiErr.RateLimitInfo.RetryAfter != 30 {
+		t.Errorf("expected RetryAfter 30, got %d", apiErr.RateLimitInfo.RetryAfter)
+	}
+}
+
+// Helper function to create string pointers
+func strPtr(s string) *string {
+	return &s
+}
