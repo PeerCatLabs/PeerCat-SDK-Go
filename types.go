@@ -40,6 +40,7 @@ type PriceResponse struct {
 	SOLPrice          float64      `json:"solPrice"`
 	SlippageTolerance float64      `json:"slippageTolerance"`
 	UpdatedAt         string       `json:"updatedAt"`
+	Treasury          string       `json:"treasury"`
 	Models            []ModelPrice `json:"models"`
 }
 

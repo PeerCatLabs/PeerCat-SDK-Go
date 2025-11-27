@@ -403,6 +403,7 @@ func TestGetPrices(t *testing.T) {
 			SOLPrice:          150.00,
 			SlippageTolerance: 0.02,
 			UpdatedAt:         time.Now().Format(time.RFC3339),
+			Treasury:          "9JKi6Tr7JdsTJw1zNedF5vML9GpPnjHD9DWuZq1oE6nV",
 			Models: []ModelPrice{
 				{Model: "stable-diffusion-xl", PriceUSD: 0.05, PriceSOL: 0.00033},
 			},
@@ -418,6 +419,9 @@ func TestGetPrices(t *testing.T) {
 	}
 	if prices.SOLPrice != 150.00 {
 		t.Errorf("expected SOLPrice 150.00, got %f", prices.SOLPrice)
+	}
+	if prices.Treasury != "9JKi6Tr7JdsTJw1zNedF5vML9GpPnjHD9DWuZq1oE6nV" {
+		t.Errorf("expected Treasury '9JKi6Tr7JdsTJw1zNedF5vML9GpPnjHD9DWuZq1oE6nV', got '%s'", prices.Treasury)
 	}
 	if len(prices.Models) != 1 {
 		t.Errorf("expected 1 model price, got %d", len(prices.Models))
